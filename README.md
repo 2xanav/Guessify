@@ -3,6 +3,8 @@
 Name songs from your own Spotify library after hearing 0.1s, 0.5s, 2s, 8s or 16s of them.
 Song info comes from the Spotify Web API; the audio is Deezer's 30-second preview of the same track.
 
+if just want to play game: https://main.d9f8k29vr3kah.amplifyapp.com/
+
 ## Scoring
 
 | Clip | 0.1s | 0.5s | 2s | 8s | 16s |
