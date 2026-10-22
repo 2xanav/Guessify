@@ -92,7 +92,7 @@ export async function findPreview(track) {
   return bySearch(track);
 }
 
-// ---------- charts and editorial playlists (no login needed) ----------
+// ---------- charts and playlists (no login needed) ----------
 
 // Same shape as spotify.js tracks. Ids are prefixed so they never collide with
 // Spotify's. Chart and playlist entries carry no release year; getDetails fills it in.
@@ -135,16 +135,6 @@ export async function getChartTracks(genreId) {
 
 export async function getPlaylistTracks(id) {
   return toTracks(await paged(`https://api.deezer.com/playlist/${id}/tracks?limit=100`, 300));
-}
-
-// Deezer's current top editorial playlists, so the list refreshes itself as
-// Deezer rotates them. Mostly-instrumental moods are useless for guessing.
-const WORDLESS = /lo-?fi|sleep|relax|calm|piano|meditat|focus|study|chill|ambient|classical|guitar|spa\b|instrumental/i;
-
-export async function getEditorialPlaylists() {
-  const data = await api('https://api.deezer.com/chart/0/playlists?limit=60');
-  if (data.error) throw new Error(data.error.message || 'Deezer request failed');
-  return (data.data ?? []).filter((p) => !WORDLESS.test(p.title)).map((p) => ({ id: p.id, name: p.title }));
 }
 
 // ---------- genres and release years ----------

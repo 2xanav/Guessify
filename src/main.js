@@ -27,23 +27,10 @@ const SOURCES = [
   { key: 'top-long', label: 'My top tracks · all time', load: () => spotify.getTopTracks('long_term') },
   { key: 'liked', label: 'Liked songs', load: () => spotify.getSavedTracks() },
 ];
-// Deezer genre ids for /chart/{id}/tracks; 0 is the overall chart.
-const DEEZER_CHARTS = [
-  [0, 'Top 200 · Worldwide'],
-  [132, 'Pop'],
-  [116, 'Hip-Hop'],
-  [165, 'R&B'],
-  [152, 'Rock'],
-  [85, 'Alternative'],
-  [113, 'Dance'],
-  [106, 'Electro'],
-  [197, 'Latin'],
-  [84, 'Country'],
-  [16, 'K-Pop & Asian'],
-  [464, 'Metal'],
-  [466, 'Folk'],
-  [144, 'Reggae'],
-  [129, 'Jazz'],
+// The only Deezer sources offered: the overall chart (/chart/0/tracks) and hand-picked public playlists.
+const DEEZER_SOURCES = [
+  ['dz-chart:0', 'Top 200 · Worldwide'],
+  ['dz-playlist:15882196161', 'Rap'],
 ];
 const ROUND_OPTIONS = [5, 10, 15, 20];
 // Picking one of these eras re-themes the app (palettes live in style.css).
@@ -87,6 +74,8 @@ function loadSettings() {
     const { era, ...saved } = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {};
     // Older versions stored a single `era` string.
     if (era && !saved.eras) saved.eras = era === 'any' ? [] : [era];
+    // Deezer charts and playlists that are no longer offered fall back to the worldwide chart.
+    if (saved.source?.startsWith('dz-') && !DEEZER_SOURCES.some(([k]) => k === saved.source)) saved.source = 'dz-chart:0';
     return { ...DEFAULT_SETTINGS, ...saved };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -109,7 +98,6 @@ const app = {
   profile: null,
   guest: false, // playing from Deezer only, without a Spotify account
   playlists: [],
-  deezerPlaylists: [], // Deezer's current editorial playlists
   poolCache: new Map(),
   pool: [],
   poolLoading: false,
@@ -139,8 +127,7 @@ const decade = (year) => (year ? `${Math.floor(year / 10) * 10}s` : null);
 function sourceLabel(key) {
   const [kind, id] = key.split(':');
   if (kind === 'playlist') return app.playlists.find((p) => p.id === id)?.name ?? 'Playlist';
-  if (kind === 'dz-chart') return `Deezer chart · ${DEEZER_CHARTS.find(([g]) => String(g) === id)?.[1] ?? 'Top'}`;
-  if (kind === 'dz-playlist') return app.deezerPlaylists.find((p) => String(p.id) === id)?.name ?? 'Deezer playlist';
+  if (kind.startsWith('dz-')) return `Deezer · ${DEEZER_SOURCES.find(([k]) => k === key)?.[1] ?? 'Top'}`;
   return SOURCES.find((s) => s.key === key)?.label ?? key;
 }
 
@@ -560,14 +547,7 @@ function renderSetupLeft() {
     <div class="stack">
       <select class="text-input${deezerKey ? ' active' : ''}" id="deezer-select" aria-label="Use a Deezer chart or playlist">
         <option value="">Pick a chart or playlist…</option>
-        <optgroup label="Charts · updated daily">
-          ${DEEZER_CHARTS.map(([id, name]) => option(`dz-chart:${id}`, name)).join('')}
-        </optgroup>
-        ${
-          app.deezerPlaylists.length
-            ? `<optgroup label="Editorial playlists">${app.deezerPlaylists.map((p) => option(`dz-playlist:${p.id}`, p.name)).join('')}</optgroup>`
-            : ''
-        }
+        ${DEEZER_SOURCES.map(([key, name]) => option(key, name)).join('')}
       </select>
     </div>`;
 }
@@ -974,12 +954,7 @@ async function enterSpotify() {
   app.screen = 'setup';
   render();
   loadPool();
-  const [playlists, deezerPlaylists] = await Promise.all([
-    spotify.getPlaylists().catch(() => []),
-    deezer.getEditorialPlaylists().catch(() => []),
-  ]);
-  app.playlists = playlists;
-  app.deezerPlaylists = deezerPlaylists;
+  app.playlists = await spotify.getPlaylists().catch(() => []);
   if (app.screen === 'setup') render();
 }
 
@@ -992,9 +967,6 @@ async function enterGuest() {
   app.screen = 'setup';
   render();
   loadPool();
-  const deezerPlaylists = await deezer.getEditorialPlaylists().catch(() => []);
-  app.deezerPlaylists = deezerPlaylists;
-  if (app.screen === 'setup') render();
 }
 
 // Spotify only accepts loopback redirect URIs written as 127.0.0.1, not localhost.
